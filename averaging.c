@@ -1,4 +1,3 @@
-#include<gsl/gsl_sf.h>
 #include "myrings.h"
 
 static double
@@ -207,7 +206,7 @@ void SinglyAverageGradH_pomega_Omega_ecc_inc(const double e1, orbit * orb, const
     SinglyAveragedForce(e1,orb,u2,F0,F1,F2,Fav,Ndim);
     
 }
-void DoubleAverageGrad(const double e1, orbit * orb, double Ftot[4], const double eps_rel[4], const double eps_abs[4]){
+void DoubleAverageGrad(const double e1, orbit * orb, double Ftot[4], const double eps_abs[4], const double eps_rel[4]){
     double F0[4],FC[4];
     double Ftot_old[4];
     double abs_err[4], rel_err[4];
@@ -255,22 +254,23 @@ void DoubleAverageGrad(const double e1, orbit * orb, double Ftot[4], const doubl
         abs_err[j] = fabs(Ftot[j]-Ftot_old[j]);
         rel_err[j] = fabs(abs_err[j] / Ftot[j]);
         tolj = ((rel_err[j] < eps_rel[j]) || (abs_err[j] < eps_abs[j]));
-        tol = tol && tolj
+        tol = tol && tolj;
      }
     
     } while(( N<16 || !(tol) ) && (N<NMax)); //((N < 16 || err > epsacc) && (N < NMax) && (derr > 0.1));
 
 }
 void 
-DoubleAverageForce(const double e1, orbit * orb, double Force[4], const double eps_rel, const double eps_abs){
+DoubleAverageForce(const double e1, orbit * orb, double Force[4], const double eps_abs, const double eps_rel){
     const double a = orb->a;
     const double I = orb->I;
+    const double e = orb->e;
     // d(pomega)/dt = -[ sqrt(1-e^2) / ( sqrt(alpha) * e ) ] * dH/de
     // d(Omega)/dt =  -1 / ( sqrt(alpha) * e )]  dH/dI
     // dG/dt =  -dH/dpomega
     // dZ/dt =  dH/dOmega
     const double pmgdot_factor = -1.0 * sqrt(1.0-e*e) / sqrt(a) / e ;
-    const double Omgdot_factor = -1.0 / sqrt(1.0-e*e) / sin(I) ; 
+    const double Omgdot_factor = -1.0 / sqrt(1.0-e*e) / sqrt(a) / sin(I) ; 
     const double Gdot_factor = -1.0; 
     const double Zdot_factor = 1.0; 
     // 0 - dH/dpomega
@@ -283,14 +283,75 @@ DoubleAverageForce(const double e1, orbit * orb, double Force[4], const double e
     eps_abs_arr[0]*=fabs(pmgdot_factor);
     eps_abs_arr[1]*=fabs(Omgdot_factor);
 
-    DoubleAverageGrad(e1, orb, Grad, eps_rel, eps_abs);
-    Force[0] = pmgdot_factor * (Grad[2]+ grad_e_correction(e1,orb,eps_rel_arr[0],eps_abs_arr[1]) );
+    DoubleAverageGrad(e1, orb, Grad, eps_abs_arr, eps_rel_arr);
+    Force[0] = pmgdot_factor * (Grad[2]);
     Force[1] = Omgdot_factor * Grad[3];
     Force[2] = Gdot_factor * Grad[0];
     Force[3] = Zdot_factor * Grad[1];
     
     
 }
-double grad_e_correction(const double e1,orbit * orb, const double eps_rel,const double eps_abs_arr){
-    return 0.0;
+
+typedef struct  {
+ orbit * o;
+ double e1,u2;
+} inner_u1_integrand_params;
+
+typedef struct  {
+ orbit * o;
+ double e1,rel_tol,abs_tol,error;
+ size_t neval, wsize;
+ int code;
+ gsl_integration_workspace * w;
+} outer_u2_integrand_params;
+
+double 
+inner_u1_integrand(double u1, void * p){
+    inner_u1_integrand_params * params;
+    params = (inner_u1_integrand_params *) p;
+    const double e1 = params->e1;
+    double XYZ[3];
+    OrbitToXYZ(params->o,params->u2,XYZ);
+    const double dx = cos(u1) - e1 - XYZ[0]; 
+    const double dy = sqrt(1.0-e1*e1) * sin(u1) - XYZ[1];
+    const double dz = XYZ[2];
+    const double Delta = sqrt(dx*dx+dy*dy+dz*dz);
+    return  (1.0 - e1 * cos(u1) )  / Delta / 2.0 / M_PI;
 }
+double 
+outer_u2_integrand(double u2, void * p){
+    outer_u2_integrand_params * outer_params;
+    outer_params = (outer_u2_integrand_params *) p;
+    inner_u1_integrand_params inner_params;
+    inner_params.o = outer_params->o;
+    inner_params.e1= outer_params->e1;
+    inner_params.u2 = u2;
+    gsl_function F;
+    F.function = &inner_u1_integrand;
+    F.params = (void *)(&inner_params);
+    double result;
+    // outer_params->code=gsl_integration_qng(&F,0.0,2.0*M_PI,(outer_params->abs_tol),(outer_params->rel_tol),&result,&(outer_params->error),&(outer_params->neval));
+    outer_params->code=gsl_integration_qags(&F,0.0,2.0*M_PI,(outer_params->abs_tol),(outer_params->rel_tol),(outer_params->wsize),(outer_params->w),&result,&(outer_params->error));
+    return result * cos(u2) / 2.0 / M_PI;
+}
+
+double grad_e_correction(const double e1,orbit * orb, const double abs_tol, const double rel_tol, gsl_integration_workspace * w , size_t wsize , grad_e_correction_error * err){
+    double result;
+    outer_u2_integrand_params pars;
+    pars.o= orb;
+    pars.e1=e1;
+    pars.abs_tol=abs_tol;
+    pars.rel_tol=rel_tol;
+    pars.w = w;
+    pars.wsize=wsize;
+    gsl_function F;
+    F.function = &outer_u2_integrand;
+    F.params = (void *) &pars;
+    //err->code = gsl_integration_qng(&F,0.0,2*M_PI, abs_tol, rel_tol, &result,&(err->error),&(err->neval));
+    err->code=gsl_integration_qags(&F,0.0,2.0*M_PI, abs_tol, rel_tol,wsize,w,&result,&(err->error));
+    const double e2 = orb->e;
+    const double a  = orb->a;
+    const double pmgfactor = -1 * sqrt(1-e2*e2) / e2 / sqrt(a);
+    return pmgfactor * result;
+}
+

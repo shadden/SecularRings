@@ -5,7 +5,7 @@
 void 
 printvector(double *X,int N){
     for(int i=0;i<N;i++){
-        printf("%.4f\t",X[i]);   
+        printf("%.8f\t",X[i]);   
     }
     printf("\n");
 }

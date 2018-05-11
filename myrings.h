@@ -5,12 +5,21 @@
 #include <math.h>
 #include <string.h>
 #include <stdbool.h>
+#include<gsl/gsl_sf.h>
 /* orbits.c */
 typedef struct {
     double a;
     double e,I,pomega,Omega;
 } orbit;
-void OrbitToXYZ(orbit * orb, double u, double XYZ[3]);
+
+void
+OrbitToXYZ(orbit * orb, double u, double XYZ[3]);
+
+void 
+OrbitToIntegrationVariables(orbit * orb, double y[4]);
+
+void 
+IntegrationVariablesToOrbit(double y[4], const double a, orbit * orb);
 
 /* averaging.c */
 void 
@@ -23,11 +32,19 @@ void
 SinglyAverageGradH_pomega_Omega_ecc_inc(const double e1, orbit * orb, const double u2,double Fav[4]);
 
 void 
-DoubleAverageGrad(const double e1, orbit * orb, double Ftot[4], const double eps_rel, const double eps_abs);
+DoubleAverageGrad(const double e1, orbit * orb, double Ftot[4], const double eps_abs[4], const double eps_rel[4]);
 
 void 
-DoubleAverageForce(const double e1, orbit * orb, double Ftot[4], const double eps_rel, const double eps_abs);
+DoubleAverageForce(const double e1, orbit * orb, double Ftot[4], const double eps_abs, const double eps_rel);
 
+typedef struct {
+    size_t neval;
+    int code;
+    double error;
+} grad_e_correction_error;
+
+double 
+grad_e_correction(const double e1,orbit * orb, const double rel_tol,const double abs_tol, gsl_integration_workspace * w , size_t wsize, grad_e_correction_error * err);
 /* vectors.c */
 void printvector(double *X,int N);
 
