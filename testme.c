@@ -1,5 +1,6 @@
 #include <myrings.h>
 #include "stdio.h"
+// function parameters for use with 'ode_f'
 typedef struct{
     double a;
     double e1;
@@ -7,6 +8,8 @@ typedef struct{
     size_t wsize;
     double force_abs_tol,force_rel_tol;
 } ode_f_pars;
+//
+// function giving dydt in form used by gsl's ode solvers 
 int ode_f(double t, const double y[], double f[],void * p){
     ode_f_pars * pars;
     pars = (ode_f_pars *) p;
@@ -79,12 +82,3 @@ int main(void){
     gsl_integration_workspace_free (w);
     gsl_odeiv2_driver_free (d);
 }
-
-// for(int i=0;i<=Npts;i++){
-//     pmg = i * ( 2*M_PI / (double) Npts);
-//     o->pomega = pmg;
-//     DoubleAverageForce(e1,o,Fav,eps_abs,eps_rel);
-//     Fav[0]+=grad_e_correction(e1, o, eps_abs, eps_rel, w, wsize, &err);
-//     printvector(Fav,4);
-//     printvector(dummy,4);
-// }
