@@ -338,8 +338,18 @@ outer_u2_integrand(double u2, void * p){
     F.function = &inner_u1_integrand;
     F.params = (void *)(&inner_params);
     double result;
-    // outer_params->code=gsl_integration_qng(&F,0.0,2.0*M_PI,(outer_params->abs_tol),(outer_params->rel_tol),&result,&(outer_params->error),&(outer_params->neval));
-    outer_params->code=gsl_integration_qags(&F,0.0,2.0*M_PI,(outer_params->abs_tol),(outer_params->rel_tol),(outer_params->wsize),(outer_params->w),&result,&(outer_params->error));
+    orbit * orb = outer_params->o;
+    
+    gsl_set_error_handler_off();
+    outer_params->code=gsl_integration_qng(&F,0.0,2.0*M_PI,(outer_params->abs_tol),(outer_params->rel_tol),&result,&(outer_params->error),&(outer_params->neval));
+   // outer_params->code=gsl_integration_qags(&F,0.0,2.0*M_PI,(outer_params->abs_tol),(outer_params->rel_tol),(outer_params->wsize),(outer_params->w),&result,&(outer_params->error));
+    if( (outer_params->code) != GSL_SUCCESS ){
+	    printf("outer integrand fails on input:\n");
+	    printf("abs_tol: %.4e\n",outer_params->abs_tol);
+	    printf("rel_tol: %.4e\n",outer_params->rel_tol);
+	    printf("e,I,pomega,Omega: %.6e\t%.6e\t%.6e\t%.6e\n",orb->e,orb->I,orb->pomega,orb->Omega);
+	    exit (-1);
+    }
     return result * cos(u2) / 2.0 / M_PI;
 }
 
@@ -356,7 +366,16 @@ double grad_e_correction(const double e1,orbit * orb, const double abs_tol, cons
     F.function = &outer_u2_integrand;
     F.params = (void *) &pars;
     //err->code = gsl_integration_qng(&F,0.0,2*M_PI, abs_tol, rel_tol, &result,&(err->error),&(err->neval));
+    //printf("%.4e\t%.4e\n",abs_tol,rel_tol);
+    gsl_set_error_handler_off();
     err->code=gsl_integration_qags(&F,0.0,2.0*M_PI, abs_tol, rel_tol,wsize,w,&result,&(err->error));
+    if( (err->code) != GSL_SUCCESS ){
+	    printf("grad_e_correction failed on input:\n");
+	    printf("abs_tol: %.4e\n",abs_tol);
+	    printf("rel_tol: %.4e\n",rel_tol);
+	    printf("e,I,pomega,Omega: %.6e\t%.6e\t%.6e\t%.6e\n",orb->e,orb->I,orb->pomega,orb->Omega);
+	    exit (-1);
+    }
     const double e2 = orb->e;
     const double a  = orb->a;
     const double pmgfactor = -1 * sqrt(1-e2*e2) / e2 / sqrt(a);

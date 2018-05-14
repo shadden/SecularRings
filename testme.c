@@ -14,7 +14,9 @@ int ode_f(double t, const double y[], double f[],void * p){
     IntegrationVariablesToOrbit(y,pars->a,&orb);
     grad_e_correction_error err;
     DoubleAverageForce(pars->e1,&orb,f,pars->force_abs_tol,pars->force_rel_tol);
-    f[0]+=grad_e_correction(pars->e1, &orb, pars->force_abs_tol,pars->force_rel_tol, pars->w, pars->wsize, &err);
+    // 
+    const double abs_err = fmin( fabs(pars->force_rel_tol * f[0]) , pars->force_abs_tol );
+    f[0]+=grad_e_correction(pars->e1, &orb,abs_err, 0.0 , pars->w, pars->wsize, &err);
     return GSL_SUCCESS;
 }
 
@@ -22,17 +24,17 @@ int main(void){
     orbit * o = malloc(sizeof(orbit));
     const double e1 = 0.33;
     double u;
-    o->a = 0.25;
-    o->e = 0.9;
-    o->I = 0.5 * M_PI - 0.3;
+    o->a = 0.15;
+    o->e = 0.05;
+    o->I = 0.1;
     o->Omega = 2.0;
-    o->pomega = M_PI;
+    o->pomega = 0.0;
 
     double Fav[4];    
     int Npts = 20;
     double pmg;
-    const double eps_abs = 1E-5;
-    const double eps_rel = 1.0;
+    const double eps_abs = 1E-12;
+    const double eps_rel = 1E-5;
     double result;
     size_t wsize = 1000;
     gsl_integration_workspace * w
@@ -52,9 +54,9 @@ int main(void){
     gsl_odeiv2_driver * d = gsl_odeiv2_driver_alloc_y_new (&sys, gsl_odeiv2_step_rkf45,
                                   1e-6, 1e-6, 0.0);
     int i;
-    double t = 0.0, t1 = 100.0;
+    double t = 0.0, t1 = 200.0;
     double y[4];
-    printf("%.8f\t%.8f\t%.8f\t%.8f\n",o->pomega,o->Omega,o->e,o->I);
+    printf("%.8f\t%.8f\t%.8f\t%.8f\t%.8f\n",0.0,o->pomega,o->Omega,o->e,o->I);
     OrbitToIntegrationVariables(o,y);
     for (i = 1; i <= 100; i++)
     {
@@ -67,7 +69,8 @@ int main(void){
         }
 
       IntegrationVariablesToOrbit(y,o->a,o);
-      printf("%.8f\t%.8f\t%.8f\t%.8f\n",o->pomega,o->Omega,o->e,o->I);
+      printf("%.8f\t%.8f\t%.8f\t%.8f\t%.8f\n",ti,o->pomega,o->Omega,o->e,o->I);
+
 
     }
 // free your memory!

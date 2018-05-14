@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <gsl/gsl_integration.h>
 #include <gsl/gsl_odeiv2.h>
+#include <gsl/gsl_errno.h>
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
