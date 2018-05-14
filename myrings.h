@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include <gsl/gsl_integration.h>
-#include <gsl/gsl_odeiv.h>
+#include <gsl/gsl_odeiv2.h>
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
@@ -19,7 +19,7 @@ void
 OrbitToIntegrationVariables(orbit * orb, double y[4]);
 
 void 
-IntegrationVariablesToOrbit(double y[4], const double a, orbit * orb);
+IntegrationVariablesToOrbit(const double y[4], const double a, orbit * orb);
 
 /* averaging.c */
 void 
@@ -28,7 +28,7 @@ getABC(const double e1, orbit * orb, const double u2,double ABC[4],const double 
 void
 lambda_roots(double ABC[4], double *l0, double *l1, double *l2);
 
-void 
+void
 SinglyAverageGradH_pomega_Omega_ecc_inc(const double e1, orbit * orb, const double u2,double Fav[4]);
 
 void 

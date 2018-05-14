@@ -87,7 +87,8 @@ UV_from_Q(double Q[3][3], const double e, double U[3], double V[3]) {
 }
 
 
-void SinglyAveragedForce(const double e1, orbit * orb, const double u2, double * F0,  double * F1,  double * F2, double * Fav, int Ndim){
+int
+SinglyAveragedForce(const double e1, orbit * orb, const double u2, double * F0,  double * F1,  double * F2, double * Fav, int Ndim){
     double ABC[4];
     getABC(e1,orb,u2,ABC,0);
     double l0,l1,l2;
@@ -99,6 +100,11 @@ void SinglyAveragedForce(const double e1, orbit * orb, const double u2, double *
     double FU,FV;
     double k2 = (l1-l2) / (l0-l2); 
     double k = sqrt(fabs(k2));
+    if (isnan(k)){
+	    return GSL_FAILURE;
+    } else if (k*k >=1.0) {
+	    return GSL_ERANGE;
+    }
     double Ek = gsl_sf_ellint_Ecomp(k, GSL_PREC_DOUBLE);
     double Kk = gsl_sf_ellint_Kcomp(k, GSL_PREC_DOUBLE);
     double prefactor = 2.0 * sqrt(l0-l2) / (l0-l1)/ (l1-l2) / M_PI;
@@ -106,7 +112,9 @@ void SinglyAveragedForce(const double e1, orbit * orb, const double u2, double *
         FU = U[0] * F0[i] + U[1] * F1[i] + U[2] * F2[i];
         FV = V[0] * F0[i] + V[1] * F1[i] + V[2] * F2[i];
         Fav[i] = prefactor * ((k2*FU+FV)*Ek - (1.0-k2)*FV*Kk );
+	if(isnan(Fav[i])){return GSL_FAILURE;}
     }
+    return GSL_SUCCESS;
 }
 void SinglyAverageGradH_pomega_Omega_ecc_inc(const double e1, orbit * orb, const double u2,double Fav[4]){
     double F0[4];
@@ -203,7 +211,7 @@ void SinglyAverageGradH_pomega_Omega_ecc_inc(const double e1, orbit * orb, const
     F2[2] = -1 * dxde;
     F2[3] = -1 * dxdI;
     
-    SinglyAveragedForce(e1,orb,u2,F0,F1,F2,Fav,Ndim);
+    int code = SinglyAveragedForce(e1,orb,u2,F0,F1,F2,Fav,Ndim);
     
 }
 void DoubleAverageGrad(const double e1, orbit * orb, double Ftot[4], const double eps_abs[4], const double eps_rel[4]){
@@ -270,7 +278,7 @@ DoubleAverageForce(const double e1, orbit * orb, double Force[4], const double e
     // dG/dt =  -dH/dpomega
     // dZ/dt =  dH/dOmega
     const double pmgdot_factor = -1.0 * sqrt(1.0-e*e) / sqrt(a) / e ;
-    const double Omgdot_factor = -1.0 / sqrt(1.0-e*e) / sqrt(a) / sin(I) ; 
+    const double Omgdot_factor = 1.0 / sqrt(1.0-e*e) / sqrt(a) / sin(I) ; 
     const double Gdot_factor = -1.0; 
     const double Zdot_factor = 1.0; 
     // 0 - dH/dpomega
